@@ -1,0 +1,15 @@
+FROM gcr.io/deeplearning-platform-release/tf-cpu.2-14.py310
+WORKDIR /
+
+# Install dependencies
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+
+# Copy shared utilities
+COPY model_metadata.py /model_metadata.py
+
+# Copy trainer code
+COPY trainer /trainer
+
+# Set up the entry point to invoke the trainer.
+ENTRYPOINT ["python", "-m", "trainer.task"]

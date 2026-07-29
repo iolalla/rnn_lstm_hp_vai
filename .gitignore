@@ -1,0 +1,23 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Python cache and temporary files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Large datasets and local models
+data/
+model.h5
+*.h5
+model/
+
+# IDEs
+.idea/
+.vscode/
+.ipynb_checkpoints/

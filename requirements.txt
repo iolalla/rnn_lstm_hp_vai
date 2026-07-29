@@ -1,0 +1,12 @@
+fire
+numpy
+pandas
+tensorflow
+tensorboard
+keras
+scikit-learn
+google-cloud-storage
+google-cloud-bigquery
+google-cloud-aiplatform
+cloudml-hypertune
+h5py
