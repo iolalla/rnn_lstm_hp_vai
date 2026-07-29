@@ -15,6 +15,9 @@ build: ## Build the Docker image (must be run from repository root)
 push: ## Push the Docker image to GCR
 	docker push $(IMAGE_URI)
 
+cloud-build: ## Build the Docker image using Google Cloud Build (no local Docker required)
+	gcloud builds submit --tag $(IMAGE_URI) .
+
 job: ## Run the orchestrator job script locally to submit to Vertex AI
 	python job.py
 

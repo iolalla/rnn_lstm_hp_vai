@@ -91,12 +91,23 @@ uv run python3 trainer/task.py \
 ## ☁️ Running on Google Cloud Vertex AI
 
 ### 1. Build and Push the Container Image
-The container must be built and pushed to Google Container Registry (GCR) so Vertex AI can pull it:
+
+You can build and push your container image using either Google Cloud Build (no local Docker required) or local Docker:
+
+#### Option A: Using Google Cloud Build (Recommended — No local Docker required)
+If you do not have Docker installed locally, or prefer to build in the cloud, run:
 ```bash
-# Build the Docker image
+make cloud-build
+```
+This builds your container image using Google Cloud Build and automatically pushes it to the registry path defined by `IMAGE_URI` in `.env`.
+
+#### Option B: Using local Docker
+If you have Docker running locally and prefer to build and push manually:
+```bash
+# Build the Docker image locally
 make build
 
-# Push the Docker image to GCR
+# Push the Docker image to the registry
 make push
 ```
 

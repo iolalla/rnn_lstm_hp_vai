@@ -40,6 +40,7 @@ The training and hyperparameter optimization are orchestrated using **Google Clo
 9. **Convenient Local Run & Env Integration in Makefile**: Added a `run-local-script` target to the `Makefile` to run the training script locally using python and `uv` with the local dataset. Also updated the `Makefile` to automatically load and export environment variables from the local `.env` file if it exists, ensuring consistent image URIs and project configurations across build, push, and job submission commands.
 10. **Dockerfile Customization**: User added `ENV GCLOUD_PROJECT=banca-march` to the `Dockerfile` to default the GCP project name when running inside the container. This change has been committed to git.
 11. **Local Configurations Updated**: User updated the local `.env` file to set `GCLOUD_PROJECT="banca-march-379915"`, `PROJECT_ID="banca-march-379915"`, and configure the `SERVICE_ACCOUNT` value.
+12. **Google Cloud Build Integration**: Added a `cloud-build` target to the `Makefile` to build the container image using Google Cloud Build (`gcloud builds submit --tag $(IMAGE_URI) .`). This allows building and pushing the container image directly in the cloud without needing a local Docker installation.
 
 ### Verification Status:
 - **test_dataset.py**: Successfully ran and verified that TensorFlow's `timeseries_dataset_from_array` creates proper input sequences and target labels.
