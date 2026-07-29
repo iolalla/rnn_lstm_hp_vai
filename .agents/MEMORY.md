@@ -36,9 +36,10 @@ The training and hyperparameter optimization are orchestrated using **Google Clo
 5. **Test Script Enhancement**: Updated `test_dataset.py` to utilize the local `data/reall-complete-IBEX-2021.csv` dataset and filter for a single ticker (`SAN.MC`) to prevent mixing different stock price series.
 6. **Import Path Correction in `task.py`**: Fixed an issue where `sys.path` insertion was going up three levels instead of two, causing `ModuleNotFoundError: No module named 'model_metadata'`.
 7. **Robust Ticker Support Added**: Added a `ticker` command-line argument to `trainer/task.py` to filter multi-ticker datasets (like `reall-complete-IBEX-2021.csv`) before training. If no ticker is specified, it defaults to the first ticker in the dataset.
-8. **Environment Variable Integration in `job.py`**: Modified `job.py` to automatically load settings from the local `.env` file using `os.getenv` with sensible defaults. This prevents hardcoded configs from overriding local configuration settings.
+8. **Environment Variable Integration in `job.py`**: Modified `job.py` to automatically load settings from the local `.env` file using `os.getenv` with sensible defaults. This prevents hardcoded configs from overriding local configuration settings. Also added support for loading and passing `SERVICE_ACCOUNT` to the Vertex AI `HyperparameterTuningJob` run method so that training trials run with correct GCP permissions.
 9. **Convenient Local Run target**: Added a `run-local-script` target to the `Makefile` to run the training script locally using python and `uv` with the local dataset.
 10. **Dockerfile Customization**: User added `ENV GCLOUD_PROJECT=banca-march` to the `Dockerfile` to default the GCP project name when running inside the container. This change has been committed to git.
+11. **Local Configurations Updated**: User updated the local `.env` file to set `GCLOUD_PROJECT="banca-march-379915"`, `PROJECT_ID="banca-march-379915"`, and configure the `SERVICE_ACCOUNT` value.
 
 ### Verification Status:
 - **test_dataset.py**: Successfully ran and verified that TensorFlow's `timeseries_dataset_from_array` creates proper input sequences and target labels.
