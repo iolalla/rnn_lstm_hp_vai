@@ -26,6 +26,7 @@ LOCATION = os.getenv("LOCATION", "europe-west1")
 STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://game-bolsa-models-hp")
 MODEL_BUCKET_NAME = os.getenv("MODEL_BUCKET_NAME", "game-bolsa-models")
 IMAGE_URI = os.getenv("IMAGE_URI", "gcr.io/game-bolsa/rnn_lstm_vai:hypertune")
+SERVICE_ACCOUNT = os.getenv("SERVICE_ACCOUNT")
 JOB_NAME = f"ibex-rnn-lstm-hp-{int(time.time())}"
 
 # Initialize Vertex AI SDK
@@ -79,7 +80,7 @@ hp_job = aiplatform.HyperparameterTuningJob(
     parallel_trial_count=3,
 )
 
-hp_job.run()
+hp_job.run(service_account=SERVICE_ACCOUNT)
 
 logging.info("Hyperparameter Tuning Job completed successfully!")
 

@@ -38,10 +38,15 @@ The training and hyperparameter optimization are orchestrated using **Google Clo
 7. **Robust Ticker Support Added**: Added a `ticker` command-line argument to `trainer/task.py` to filter multi-ticker datasets (like `reall-complete-IBEX-2021.csv`) before training. If no ticker is specified, it defaults to the first ticker in the dataset.
 8. **Environment Variable Integration in `job.py`**: Modified `job.py` to automatically load settings from the local `.env` file using `os.getenv` with sensible defaults. This prevents hardcoded configs from overriding local configuration settings.
 9. **Convenient Local Run target**: Added a `run-local-script` target to the `Makefile` to run the training script locally using python and `uv` with the local dataset.
+10. **Dockerfile Customization**: User added `ENV GCLOUD_PROJECT=banca-march` to the `Dockerfile` to default the GCP project name when running inside the container. This change has been committed to git.
 
 ### Verification Status:
 - **test_dataset.py**: Successfully ran and verified that TensorFlow's `timeseries_dataset_from_array` creates proper input sequences and target labels.
-- **trainer/task.py (Local Script Run)**: Successfully executed a local training run (1 epoch) using the local dataset and the new ticker filtering option. Saved the model to `model.h5` and embedded metadata successfully.
+- **trainer/task.py (Local Script Run)**: Successfully executed local training runs (1 and 2 epochs) using the local dataset and the new ticker filtering option. Saved the model to `model.h5` and embedded metadata successfully.
+  - **Epochs**: 2
+  - **Loss (MSE)**: `0.2407`
+  - **Directional Accuracy**: `48.59%`
+  - *Note*: Both the agent and the user have executed this target successfully in the local shell.
 
 ## 4. Architectural Diagram
 ```mermaid
@@ -66,11 +71,11 @@ graph TD
 ```
 
 ## 5. Next Steps & Roadmap
-1. **Verify `make run-local-script`**: Ensure the new Makefile target runs successfully and produces the expected output.
-2. **Review Dockerfile**: Ensure the Dockerfile is optimized and includes all necessary files.
-3. **Commit and Prepare for Push**:
-   - Stage all relevant files (excluding `.env`, `.venv`, and temporary files).
-   - Create a clean git commit history.
-   - Set up instructions for pushing to GitHub.
-4. **Draft a Professional README.md**:
-   - Document project goals, architecture, local setup, and GCP deployment steps.
+1. **Review Dockerfile**: Ensure the Dockerfile is optimized and includes all necessary files (completed, user added `ENV GCLOUD_PROJECT=banca-march`).
+2. **Commit and Prepare for Push**:
+   - Stage all relevant files (completed).
+   - Create a clean git commit history (completed).
+   - Set up instructions for pushing to GitHub (completed).
+3. **Verify job.py Configurations**:
+   - Check if `job.py` constants match the user's active GCP project and bucket configurations.
+   - Ensure credentials and environment variables are set up correctly.
