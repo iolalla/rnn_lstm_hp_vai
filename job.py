@@ -10,23 +10,12 @@ from google.cloud import storage
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(message)s')
 
-# Load .env file manually if it exists
-if os.path.exists(".env"):
-    with open(".env") as f:
-        for line in f:
-            if line.strip() and not line.strip().startswith("#"):
-                parts = line.strip().split("=", 1)
-                if len(parts) == 2:
-                    key, val = parts
-                    os.environ[key.strip()] = val.strip().strip('"').strip("'")
-
 # Constants
-PROJECT_ID = os.getenv("PROJECT_ID", "game-bolsa")
-LOCATION = os.getenv("LOCATION", "europe-west1")
-STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://game-bolsa-models-hp")
-MODEL_BUCKET_NAME = os.getenv("MODEL_BUCKET_NAME", "game-bolsa-models")
-IMAGE_URI = os.getenv("IMAGE_URI", "gcr.io/game-bolsa/rnn_lstm_vai:hypertune")
-SERVICE_ACCOUNT = os.getenv("SERVICE_ACCOUNT")
+PROJECT_ID = "banca-march"
+LOCATION = "europe-west1"
+STAGING_BUCKET = "gs://banca-march-models-hp"
+MODEL_BUCKET_NAME = "banca-march-models"
+IMAGE_URI = "gcr.io/banca-march/rnn_lstm_vai:hypertune"
 JOB_NAME = f"ibex-rnn-lstm-hp-{int(time.time())}"
 
 # Initialize Vertex AI SDK
@@ -80,7 +69,7 @@ hp_job = aiplatform.HyperparameterTuningJob(
     parallel_trial_count=3,
 )
 
-hp_job.run(service_account=SERVICE_ACCOUNT)
+hp_job.run()
 
 logging.info("Hyperparameter Tuning Job completed successfully!")
 
