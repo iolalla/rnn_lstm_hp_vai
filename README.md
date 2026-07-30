@@ -21,12 +21,12 @@ This repository contains a complete, production-ready pipeline for training Recu
 ## 🛠️ Repository Structure
 
 - `trainer/`: Contains the training package executed by Vertex AI.
-  - [task.py](file:///home/iolalla/src/rnn_lstm_hp_vai/trainer/task.py): Main training entrypoint (handles data loading, normalization, sequence creation, model training, evaluation, metadata embedding, GCS upload, and BigQuery logging).
-- [job.py](file:///home/iolalla/src/rnn_lstm_hp_vai/job.py): Orchestrates and submits the hyperparameter tuning job to Vertex AI, tracks trials, identifies the best trial, and copies the best model to GCS.
-- [model_metadata.py](file:///home/iolalla/src/rnn_lstm_hp_vai/model_metadata.py): Shared utility library for collecting metadata, embedding it into `.h5` files, and logging evaluation summaries.
-- [test_dataset.py](file:///home/iolalla/src/rnn_lstm_hp_vai/test_dataset.py): Diagnostic script to verify sequence generation and timeseries dataset compatibility.
-- [Makefile](file:///home/iolalla/src/rnn_lstm_hp_vai/Makefile): Simplifies building, pushing, running local training, and submitting jobs.
-- [Dockerfile](file:///home/iolalla/src/rnn_lstm_hp_vai/Dockerfile): Container image definition for local and cloud training.
+  - [task.py](rnn_lstm_hp_vai/trainer/task.py): Main training entrypoint (handles data loading, normalization, sequence creation, model training, evaluation, metadata embedding, GCS upload, and BigQuery logging).
+- [job.py](rnn_lstm_hp_vai/job.py): Orchestrates and submits the hyperparameter tuning job to Vertex AI, tracks trials, identifies the best trial, and copies the best model to GCS.
+- [model_metadata.py](rnn_lstm_hp_vai/model_metadata.py): Shared utility library for collecting metadata, embedding it into `.h5` files, and logging evaluation summaries.
+- [test_dataset.py](rnn_lstm_hp_vai/test_dataset.py): Diagnostic script to verify sequence generation and timeseries dataset compatibility.
+- [Makefile](rnn_lstm_hp_vai/Makefile): Simplifies building, pushing, running local training, and submitting jobs.
+- [Dockerfile](rnn_lstm_hp_vai/Dockerfile): Container image definition for local and cloud training.
 
 ---
 
@@ -53,11 +53,11 @@ pip install -r requirements.txt
 ### 3. Configure Environment Variables
 Create a `.env` file in the root directory to configure your Google Cloud project and bucket names:
 ```env
-PROJECT_ID=your-gcp-project-id
+PROJECT_ID=banca-march-379915
 LOCATION=europe-west1
-STAGING_BUCKET=gs://your-staging-bucket-for-tuning
-MODEL_BUCKET_NAME=your-final-model-bucket
-IMAGE_URI=gcr.io/your-gcp-project-id/rnn_lstm_vai:hypertune
+STAGING_BUCKET=gs://banca-march-models
+MODEL_BUCKET_NAME=banca-march-models
+IMAGE_URI=gcr.io/banca-march-379915/rnn_lstm_vai:hypertune
 ```
 
 ---
@@ -147,6 +147,6 @@ SELECT
   JSON_VALUE(metrics, '$.mse') as val_mse,
   JSON_VALUE(metrics, '$.directional_accuracy') as dir_accuracy,
   model_path 
-FROM `your-gcp-project-id.play.trains` 
+FROM `banca-march-379915.play.trains` 
 ORDER BY training_date DESC;
 ```

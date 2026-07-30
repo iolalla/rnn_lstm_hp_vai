@@ -2,7 +2,7 @@
 """
 Script to extract a subset of date-filtered data from a complete stock/index CSV file.
 By default, extracts data from start year 2000 to end year 2020.
- uv run python extract_2000_2020.py --input data/reall-complete-SAN-2000-2025.csv --output data/reall-complete-SAN-2000-2020.csv --start-year 2000 --end-year 2020
+ uv run python extract_data.py --input data/reall-complete-SAN-2000-2025.csv --output data/reall-complete-SAN-2000-2020.csv --start-year 2000 --end-year 2020
 """
 
 import argparse

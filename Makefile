@@ -22,19 +22,6 @@ job: ## Run the orchestrator job script locally to submit to Vertex AI
 	uv run python3 job.py
 
 run-local: ## Run the container locally using host network to connect to BigQuery emulator
-	docker run --rm -it --net=host \
-		-e ISLOCAL=true \
-		-e BIGQUERY_EMULATOR_HOST=localhost:9050 \
-		$(IMAGE_URI) \
-		--epochs=2 \
-		--learning_rate=0.001 \
-		--units=32 \
-		--activation=relu \
-		--dropout_rate=0.1 \
-		--activation_output=linear \
-		--filedata=https://storage.googleapis.com/ibex35/data/IBEX-1994-2020.csv
-
-run-local-script: ## Run the training script locally using python and uv
 	uv run python3 trainer/task.py \
 		--epochs=2 \
 		--learning_rate=0.001 \
@@ -42,20 +29,8 @@ run-local-script: ## Run the training script locally using python and uv
 		--activation=relu \
 		--dropout_rate=0.1 \
 		--activation_output=linear \
-		--filedata=data/reall-complete-IBEX-2021.csv \
-		--ticker=SAN.MC
-
-run-new-strategy: ## Run the training script locally with the new strategy (2000-2020 train, 2021 val)
-	uv run python3 trainer/task.py \
-		--epochs=2 \
-		--learning_rate=0.001 \
-		--units=32 \
-		--activation=relu \
-		--dropout_rate=0.1 \
-		--activation_output=linear \
-		--filedata=data/reall-complete-2000-2025.csv \
-		--train_end_date=2020-12-31 \
+		--filedata=data/reall-complete-2000-2020.csv \
 		--val_filedata=data/reall-complete-IBEX-2021.csv \
 		--ticker=SAN.MC
 
-all: build push ## Build and push the image
+all: cloud-build push ## Build and push the image

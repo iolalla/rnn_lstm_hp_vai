@@ -45,7 +45,7 @@ def get_bigquery_client():
         client_options = ClientOptions(api_endpoint=endpoint)
         from google.auth.credentials import AnonymousCredentials
         return bigquery.Client(
-            project="game-bolsa",
+            project="banca-march-379915",
             client_options=client_options,
             credentials=AnonymousCredentials()
         )
@@ -131,7 +131,7 @@ def create_sequences(data: pd.DataFrame, seq_length: int) -> tuple:
         ys.append(y.values.flatten())  # Aplana para forma (10,)
     return np.array(xs), np.array(ys)
 
-def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-1994-2020.csv",
+def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-hp/data/reall-complete-2000-2020.csv",
                    modelpath="model/ibex_rnn_lstm_hp_model.h5",
                    epochs=10,
                    learning_rate=0.001,
@@ -141,13 +141,9 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
                    activation_output="linear",
                    job_id=None,
                    trial_id=None,
-                   bucket_name="game-bolsa-models",
+                   bucket_name="banca-march-models",
                    ticker=None,
-                   val_filedata=None,
-                   train_start_date=None,
-                   train_end_date=None,
-                   val_start_date=None,
-                   val_end_date=None
+                   val_filedata=None
                    ):
     # Set job_id and trial_id from env if not passed
     if not job_id:
@@ -184,7 +180,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
         local_val_filedata = download_from_gcs_if_needed(val_filedata, "/tmp/val_dataset.csv")
 
     # Helper function to load and preprocess a dataset
-    def load_and_preprocess(filepath, ticker_to_filter, start_date, end_date, label="dataset"):
+    def load_and_preprocess(filepath, ticker_to_filter, label="dataset"):
         logging.info(f"Loading {label} from: {filepath}...")
         df = pd.read_csv(filepath)
         
@@ -215,25 +211,15 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
                 
         df.set_index('Date', drop=True, inplace=True)
         df.sort_index(inplace=True)
-        
-        # Filter by date range if provided
-        if start_date:
-            start_dt = pd.to_datetime(start_date)
-            df = df[df.index >= start_dt]
-            logging.info(f"Filtered {label} to start date: {start_date} (remaining rows: {len(df)})")
-        if end_date:
-            end_dt = pd.to_datetime(end_date)
-            df = df[df.index <= end_dt]
-            logging.info(f"Filtered {label} to end date: {end_date} (remaining rows: {len(df)})")
             
         return df, actual_ticker
 
     # Load and preprocess training data
-    train_df, ticker = load_and_preprocess(local_filedata, ticker, train_start_date, train_end_date, "training data")
+    train_df, ticker = load_and_preprocess(local_filedata, ticker, "training data")
 
     # Load and preprocess validation data if provided
     if local_val_filedata:
-        val_df, val_ticker = load_and_preprocess(local_val_filedata, ticker, val_start_date, val_end_date, "validation data")
+        val_df, val_ticker = load_and_preprocess(local_val_filedata, ticker, "validation data")
         if val_ticker != ticker:
             logging.warning(f"Ticker mismatch! Training ticker: {ticker}, Validation ticker: {val_ticker}")
     else:
@@ -354,11 +340,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
             'activation_output': activation_output,
             'epochs': int(epochs),
             'ticker': ticker if ticker else "N/A",
-            'val_dataset_file': original_val_filedata if original_val_filedata else "N/A",
-            'train_start_date': train_start_date if train_start_date else "N/A",
-            'train_end_date': train_end_date if train_end_date else "N/A",
-            'val_start_date': val_start_date if val_start_date else "N/A",
-            'val_end_date': val_end_date if val_end_date else "N/A"
+            'val_dataset_file': original_val_filedata if original_val_filedata else "N/A"
         })
         metrics_json = json.dumps(final_metrics)
         

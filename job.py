@@ -43,12 +43,8 @@ SERVICE_ACCOUNT = os.getenv("SERVICE_ACCOUNT")
 JOB_NAME = f"ibex-rnn-lstm-hp-{int(time.time())}"
 
 # Dataset and filtering configuration
-FILEDATA = os.getenv("FILEDATA", f"{STAGING_BUCKET}/data/reall-complete-2000-2025.csv")
-TRAIN_START_DATE = os.getenv("TRAIN_START_DATE")
-TRAIN_END_DATE = os.getenv("TRAIN_END_DATE", "2020-12-31")
+FILEDATA = os.getenv("FILEDATA", f"{STAGING_BUCKET}/data/reall-complete-2000-2020.csv")
 VAL_FILEDATA = os.getenv("VAL_FILEDATA", f"{STAGING_BUCKET}/data/reall-complete-IBEX-2021.csv")
-VAL_START_DATE = os.getenv("VAL_START_DATE")
-VAL_END_DATE = os.getenv("VAL_END_DATE")
 
 # Define custom credentials class to automatically refresh gcloud access token
 class GcloudCredentials(BaseCredentials):
@@ -65,14 +61,21 @@ class GcloudCredentials(BaseCredentials):
             logging.error(f"Failed to refresh gcloud token: {e}")
             raise e
 
-# Get credentials using gcloud access token if GOOGLE_APPLICATION_CREDENTIALS is not set
+# Load credentials (first try standard GCP discovery, then fallback to custom gcloud class)
 creds = None
-if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
+try:
+    import google.auth
+    creds, default_project = google.auth.default()
+    logging.info(f"Successfully loaded default Google Cloud credentials (Type: {type(creds).__name__}).")
+except Exception as e:
+    logging.warning(f"Failed to load default GCP credentials: {e}")
+
+if not creds:
     try:
-        logging.info("GOOGLE_APPLICATION_CREDENTIALS not set. Using self-refreshing gcloud credentials...")
+        logging.info("No standard credentials found. Using self-refreshing gcloud credentials fallback...")
         creds = GcloudCredentials()
     except Exception as e:
-        logging.warning(f"Failed to initialize gcloud credentials: {e}. Falling back to default auth.")
+        logging.warning(f"Failed to initialize custom gcloud credentials: {e}. Falling back to default auth.")
 
 # Initialize Vertex AI SDK
 aiplatform.init(project=PROJECT_ID, location=LOCATION, staging_bucket=STAGING_BUCKET, credentials=creds)
@@ -85,16 +88,8 @@ container_args = [
     "--job_id", JOB_NAME
 ]
 
-if TRAIN_START_DATE:
-    container_args.extend(["--train_start_date", TRAIN_START_DATE])
-if TRAIN_END_DATE:
-    container_args.extend(["--train_end_date", TRAIN_END_DATE])
 if VAL_FILEDATA:
     container_args.extend(["--val_filedata", VAL_FILEDATA])
-if VAL_START_DATE:
-    container_args.extend(["--val_start_date", VAL_START_DATE])
-if VAL_END_DATE:
-    container_args.extend(["--val_end_date", VAL_END_DATE])
 
 # Define worker pool specs
 worker_pool_specs = [
@@ -230,9 +225,43 @@ if best_trial:
         logging.info(f"Looking for model blob at gs://{staging_bucket_name}/{best_trial_model_blob_name}...")
     
     if best_blob.exists():
-        logging.info(f"Copying best model from gs://{staging_bucket_name}/{best_blob.name} to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}...")
-        staging_bucket.copy_blob(best_blob, dest_bucket, final_model_blob_name)
-        logging.info(f"Successfully saved best model to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}!")
+        logging.info(f"Processing and downloading best model from gs://{staging_bucket_name}/{best_blob.name}...")
+        import tempfile
+        from model_metadata import read_metadata, embed_metadata_h5
+        
+        # Download best blob to a local temp file
+        local_temp_model = tempfile.mktemp(suffix=".h5")
+        try:
+            best_blob.download_to_filename(local_temp_model)
+            logging.info(f"Downloaded best model to local path: {local_temp_model}")
+            
+            # Read existing metadata from the file
+            try:
+                meta = read_metadata(local_temp_model)
+                logging.info("Successfully read existing model metadata.")
+            except Exception as e:
+                logging.warning(f"Failed to read existing metadata: {e}. Starting with empty metadata.")
+                meta = {}
+                
+            # Update metadata with tuning-specific details
+            meta['tuning_job_id'] = JOB_NAME
+            meta['best_trial_id'] = best_trial.id
+            meta['best_mse'] = best_mse
+            meta['is_best_model'] = True
+            meta['best_parameters'] = best_params
+            
+            # Embed updated metadata back into the file
+            embed_metadata_h5(local_temp_model, meta)
+            
+            # Upload the modified file back to GCS
+            logging.info(f"Uploading updated best model to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}...")
+            dest_blob = dest_bucket.blob(final_model_blob_name)
+            dest_blob.upload_from_filename(local_temp_model)
+            logging.info(f"Successfully saved updated best model to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}!")
+        finally:
+            # Clean up local temp file
+            if os.path.exists(local_temp_model):
+                os.remove(local_temp_model)
     else:
         logging.warning(f"Could not find best trial's model blob at gs://{staging_bucket_name}/{best_blob.name}!")
 else:
