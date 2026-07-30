@@ -179,23 +179,47 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
     if val_filedata:
         local_val_filedata = download_from_gcs_if_needed(val_filedata, "/tmp/val_dataset.csv")
 
+    # If ticker is not specified, determine a smart default ticker
+    if not ticker:
+        try:
+            # Read only Ticker column to find unique tickers quickly
+            train_cols = pd.read_csv(local_filedata, nrows=1).columns
+            if 'Ticker' in train_cols:
+                train_tickers = set(pd.read_csv(local_filedata, usecols=['Ticker'])['Ticker'].unique())
+                
+                # If validation file is provided, check its tickers too
+                if local_val_filedata:
+                    val_cols = pd.read_csv(local_val_filedata, nrows=1).columns
+                    if 'Ticker' in val_cols:
+                        val_tickers = set(pd.read_csv(local_val_filedata, usecols=['Ticker'])['Ticker'].unique())
+                        common_tickers = train_tickers.intersection(val_tickers)
+                    else:
+                        common_tickers = set()
+                else:
+                    common_tickers = train_tickers
+                
+                # Choose the best default ticker
+                if 'SAN.MC' in common_tickers:
+                    ticker = 'SAN.MC'
+                    logging.info("No ticker specified. Defaulting to 'SAN.MC' (found in both datasets).")
+                elif common_tickers:
+                    ticker = sorted(list(common_tickers))[0]
+                    logging.info(f"No ticker specified. Defaulting to first common ticker: '{ticker}'.")
+                else:
+                    ticker = sorted(list(train_tickers))[0]
+                    logging.info(f"No ticker specified. Defaulting to first training ticker: '{ticker}'.")
+        except Exception as e:
+            logging.warning(f"Failed to determine smart default ticker: {e}. Falling back to standard behavior.")
+
     # Helper function to load and preprocess a dataset
     def load_and_preprocess(filepath, ticker_to_filter, label="dataset"):
         logging.info(f"Loading {label} from: {filepath}...")
         df = pd.read_csv(filepath)
         
-        # Filter by ticker if 'Ticker' column exists
-        actual_ticker = ticker_to_filter
-        if 'Ticker' in df.columns:
-            if actual_ticker:
-                df = df[df['Ticker'] == actual_ticker]
-                logging.info(f"Filtered {label} for ticker: {actual_ticker}")
-            else:
-                unique_tickers = df['Ticker'].unique()
-                if len(unique_tickers) > 0:
-                    actual_ticker = unique_tickers[0]
-                    df = df[df['Ticker'] == actual_ticker]
-                    logging.info(f"No ticker specified for {label}. Defaulting to first ticker: {actual_ticker}")
+        # Filter by ticker if 'Ticker' column exists and ticker_to_filter is provided
+        if 'Ticker' in df.columns and ticker_to_filter:
+            df = df[df['Ticker'] == ticker_to_filter]
+            logging.info(f"Filtered {label} for ticker: {ticker_to_filter}")
         
         df = df[['Date', 'Close']]  # Extracting required columns
         df.dropna(inplace=True)
@@ -212,16 +236,14 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
         df.set_index('Date', drop=True, inplace=True)
         df.sort_index(inplace=True)
             
-        return df, actual_ticker
+        return df
 
     # Load and preprocess training data
-    train_df, ticker = load_and_preprocess(local_filedata, ticker, "training data")
+    train_df = load_and_preprocess(local_filedata, ticker, "training data")
 
     # Load and preprocess validation data if provided
     if local_val_filedata:
-        val_df, val_ticker = load_and_preprocess(local_val_filedata, ticker, "validation data")
-        if val_ticker != ticker:
-            logging.warning(f"Ticker mismatch! Training ticker: {ticker}, Validation ticker: {val_ticker}")
+        val_df = load_and_preprocess(local_val_filedata, ticker, "validation data")
     else:
         val_df = None
 
