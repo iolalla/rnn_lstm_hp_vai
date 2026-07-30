@@ -19,7 +19,7 @@ cloud-build: ## Build the Docker image using Google Cloud Build (no local Docker
 	gcloud builds submit --tag $(IMAGE_URI) .
 
 job: ## Run the orchestrator job script locally to submit to Vertex AI
-	python job.py
+	uv run python3 job.py
 
 run-local: ## Run the container locally using host network to connect to BigQuery emulator
 	docker run --rm -it --net=host \
@@ -43,6 +43,19 @@ run-local-script: ## Run the training script locally using python and uv
 		--dropout_rate=0.1 \
 		--activation_output=linear \
 		--filedata=data/reall-complete-IBEX-2021.csv \
+		--ticker=SAN.MC
+
+run-new-strategy: ## Run the training script locally with the new strategy (2000-2020 train, 2021 val)
+	uv run python3 trainer/task.py \
+		--epochs=2 \
+		--learning_rate=0.001 \
+		--units=32 \
+		--activation=relu \
+		--dropout_rate=0.1 \
+		--activation_output=linear \
+		--filedata=data/reall-complete-2000-2025.csv \
+		--train_end_date=2020-12-31 \
+		--val_filedata=data/reall-complete-IBEX-2021.csv \
 		--ticker=SAN.MC
 
 all: build push ## Build and push the image

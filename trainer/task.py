@@ -25,7 +25,7 @@ import sys as _sys
 import os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import h5py
-from model_metadata import build_training_metadata, embed_metadata_h5, log_and_evaluate_supervised
+from model_metadata import build_training_metadata, embed_metadata_h5, log_and_evaluate_supervised, serialize_scaler_map, crc32_file, _data_stats
 
 from google.cloud import storage
 from google.cloud import bigquery
@@ -142,7 +142,12 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
                    job_id=None,
                    trial_id=None,
                    bucket_name="game-bolsa-models",
-                   ticker=None
+                   ticker=None,
+                   val_filedata=None,
+                   train_start_date=None,
+                   train_end_date=None,
+                   val_start_date=None,
+                   val_end_date=None
                    ):
     # Set job_id and trial_id from env if not passed
     if not job_id:
@@ -151,45 +156,103 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
         trial_id = os.getenv("AIP_TRIAL_ID")
 
     logging.info("Tensorflow version " + tf.__version__)
-    logging.info('> Loading data... ')
-
-    data = pd.read_csv(filedata)
-    logging.info(data.head())
-
-    # Filter by ticker if 'Ticker' column exists
-    if 'Ticker' in data.columns:
-        if ticker:
-            data = data[data['Ticker'] == ticker]
-            logging.info(f"Filtered dataset for ticker: {ticker}")
-        else:
-            unique_tickers = data['Ticker'].unique()
-            if len(unique_tickers) > 0:
-                ticker = unique_tickers[0]
-                data = data[data['Ticker'] == ticker]
-                logging.info(f"No ticker specified. Defaulting to first ticker: {ticker}")
-
-    data = data[['Date', 'Close']]  # Extracting required columns
-    data.dropna(inplace=True)
     
-    # Try multiple date formats
-    try:
-        data['Date'] = pd.to_datetime(data['Date'].apply(lambda x: x.split()[0]), format='%Y-%m-%d')
-    except Exception:
-        try:
-            data['Date'] = pd.to_datetime(data['Date'].apply(lambda x: x.split()[0]), format='%d/%m/%Y')
-        except Exception:
-            data['Date'] = pd.to_datetime(data['Date'].apply(lambda x: x.split()[0]))
+    # Save original paths for metadata
+    original_filedata = filedata
+    original_val_filedata = val_filedata
 
-    data.set_index('Date', drop=True, inplace=True)
-    logging.info(data.head())
+    # Helper function to download from GCS if needed
+    def download_from_gcs_if_needed(path, local_path):
+        if path.startswith("gs://"):
+            logging.info(f"Downloading data from GCS path: {path}...")
+            from google.cloud import storage
+            path_parts = path[5:].split("/", 1)
+            b_name = path_parts[0]
+            blob_name = path_parts[1]
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(b_name)
+            blob = bucket.blob(blob_name)
+            blob.download_to_filename(local_path)
+            logging.info(f"Successfully downloaded to local path: {local_path}")
+            return local_path
+        return path
+
+    # Download datasets if they are GCS paths
+    local_filedata = download_from_gcs_if_needed(filedata, "/tmp/train_dataset.csv")
+    local_val_filedata = None
+    if val_filedata:
+        local_val_filedata = download_from_gcs_if_needed(val_filedata, "/tmp/val_dataset.csv")
+
+    # Helper function to load and preprocess a dataset
+    def load_and_preprocess(filepath, ticker_to_filter, start_date, end_date, label="dataset"):
+        logging.info(f"Loading {label} from: {filepath}...")
+        df = pd.read_csv(filepath)
+        
+        # Filter by ticker if 'Ticker' column exists
+        actual_ticker = ticker_to_filter
+        if 'Ticker' in df.columns:
+            if actual_ticker:
+                df = df[df['Ticker'] == actual_ticker]
+                logging.info(f"Filtered {label} for ticker: {actual_ticker}")
+            else:
+                unique_tickers = df['Ticker'].unique()
+                if len(unique_tickers) > 0:
+                    actual_ticker = unique_tickers[0]
+                    df = df[df['Ticker'] == actual_ticker]
+                    logging.info(f"No ticker specified for {label}. Defaulting to first ticker: {actual_ticker}")
+        
+        df = df[['Date', 'Close']]  # Extracting required columns
+        df.dropna(inplace=True)
+        
+        # Try multiple date formats
+        try:
+            df['Date'] = pd.to_datetime(df['Date'].apply(lambda x: x.split()[0]), format='%Y-%m-%d')
+        except Exception:
+            try:
+                df['Date'] = pd.to_datetime(df['Date'].apply(lambda x: x.split()[0]), format='%d/%m/%Y')
+            except Exception:
+                df['Date'] = pd.to_datetime(df['Date'].apply(lambda x: x.split()[0]))
+                
+        df.set_index('Date', drop=True, inplace=True)
+        df.sort_index(inplace=True)
+        
+        # Filter by date range if provided
+        if start_date:
+            start_dt = pd.to_datetime(start_date)
+            df = df[df.index >= start_dt]
+            logging.info(f"Filtered {label} to start date: {start_date} (remaining rows: {len(df)})")
+        if end_date:
+            end_dt = pd.to_datetime(end_date)
+            df = df[df.index <= end_dt]
+            logging.info(f"Filtered {label} to end date: {end_date} (remaining rows: {len(df)})")
+            
+        return df, actual_ticker
+
+    # Load and preprocess training data
+    train_df, ticker = load_and_preprocess(local_filedata, ticker, train_start_date, train_end_date, "training data")
+
+    # Load and preprocess validation data if provided
+    if local_val_filedata:
+        val_df, val_ticker = load_and_preprocess(local_val_filedata, ticker, val_start_date, val_end_date, "validation data")
+        if val_ticker != ticker:
+            logging.warning(f"Ticker mismatch! Training ticker: {ticker}, Validation ticker: {val_ticker}")
+    else:
+        val_df = None
 
     # Normalization
     mms = MinMaxScaler()
-    data[['Close']] = mms.fit_transform(data[['Close']])
-
-    training_size = round(len(data) * 0.80)
-    train_data = data[:training_size]
-    test_data = data[training_size:]
+    if val_df is not None:
+        train_data = train_df.copy()
+        test_data = val_df.copy()
+        train_data[['Close']] = mms.fit_transform(train_data[['Close']])
+        test_data[['Close']] = mms.transform(test_data[['Close']])
+    else:
+        # Fallback to 80/20 split of train_df
+        training_size = round(len(train_df) * 0.80)
+        train_data = train_df[:training_size].copy()
+        test_data = train_df[training_size:].copy()
+        train_data[['Close']] = mms.fit_transform(train_data[['Close']])
+        test_data[['Close']] = mms.transform(test_data[['Close']])
 
     train_seq, train_label = create_sequences(train_data, 10)
     test_seq, test_label = create_sequences(test_data, 10)
@@ -230,7 +293,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
     logging.info(f"Reported MSE to Vertex AI: {val_mse}")
 
     # Build and embed metadata
-    meta = build_training_metadata(filedata, {
+    meta = build_training_metadata(local_filedata, {
         'epochs': int(epochs),
         'learning_rate': float(learning_rate),
         'units': int(units),
@@ -240,6 +303,19 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
         'ticker': ticker if ticker else "N/A",
         'final_metrics': final_metrics,
     })
+    
+    # Overwrite data_file with original path
+    meta['data_file'] = original_filedata
+    
+    # Add scaler to metadata
+    meta['scalers'] = serialize_scaler_map({ticker: mms}) if ticker else serialize_scaler_map({None: mms})
+    
+    # Add validation metadata if val_filedata is provided
+    if val_filedata:
+        meta['val_data_file'] = original_val_filedata
+        meta['val_data_file_crc32'] = crc32_file(local_val_filedata)
+        meta['val_data_stats'] = _data_stats(local_val_filedata)
+        
     embed_metadata_h5(local_model_path, meta)
 
     # Save model to GCS
@@ -277,7 +353,12 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
             'dropout_rate': float(dropout_rate),
             'activation_output': activation_output,
             'epochs': int(epochs),
-            'ticker': ticker if ticker else "N/A"
+            'ticker': ticker if ticker else "N/A",
+            'val_dataset_file': original_val_filedata if original_val_filedata else "N/A",
+            'train_start_date': train_start_date if train_start_date else "N/A",
+            'train_end_date': train_end_date if train_end_date else "N/A",
+            'val_start_date': val_start_date if val_start_date else "N/A",
+            'val_end_date': val_end_date if val_end_date else "N/A"
         })
         metrics_json = json.dumps(final_metrics)
         
@@ -291,7 +372,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/ibex35/data/IBEX-199
             "model_path": model_gcs_url if model_gcs_url else local_model_path,
             "git_commit": meta.get("git_commit"),
             "git_branch": meta.get("git_branch"),
-            "dataset_file": filedata
+            "dataset_file": original_filedata
         }
         
         insert_train_result(bq_client, row_data)
