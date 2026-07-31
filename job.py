@@ -133,6 +133,7 @@ else:
         "activation": hpt.CategoricalParameterSpec(values=['relu', 'tanh', 'sigmoid', 'linear']),
         "dropout_rate": hpt.DoubleParameterSpec(min=0.1, max=0.5, scale="linear"),
         "activation_output": hpt.CategoricalParameterSpec(values=['relu', 'tanh', 'sigmoid', 'linear']),
+        "num_layers": hpt.DiscreteParameterSpec(values=[1, 2, 3,4], scale=None),
     }
 
     # Define metric spec
@@ -145,7 +146,7 @@ else:
         custom_job=my_custom_job,
         metric_spec=metric_spec,
         parameter_spec=parameter_spec,
-        max_trial_count=15,
+        max_trial_count=150,
         parallel_trial_count=3,
     )
 

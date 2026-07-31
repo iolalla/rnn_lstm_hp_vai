@@ -104,20 +104,22 @@ def upload_to_bucket(blob_name, path_to_file, bucket_name):
     blob.upload_from_filename(path_to_file)
     return blob.public_url
 
-def build_model(units, activation, dropout_rate, activation_output, learning_rate):
+def build_model(units, activation, dropout_rate, activation_output, learning_rate, num_layers=1):
     """Creating LSTM model"""
     input_shape = (10, 1)
-    model = Sequential([
-        Input(shape=input_shape),
-        Bidirectional(
+    model = Sequential()
+    model.add(Input(shape=input_shape))
+    for i in range(num_layers):
+        return_seq = (i < num_layers - 1)
+        model.add(Bidirectional(
             LSTM(
                 units=units,
-                activation=activation
+                activation=activation,
+                return_sequences=return_seq
             )
-        ),
-        Dropout(dropout_rate),
-        Dense(10, activation=activation_output)
-    ])
+        ))
+        model.add(Dropout(dropout_rate))
+    model.add(Dense(10, activation=activation_output))
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['mse'])
     return model
@@ -139,6 +141,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
                    activation="relu",
                    dropout_rate=0.1,
                    activation_output="linear",
+                   num_layers=1,
                    job_id=None,
                    trial_id=None,
                    bucket_name="banca-march-models",
@@ -271,7 +274,8 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
         activation=activation,
         dropout_rate=float(dropout_rate),
         activation_output=activation_output,
-        learning_rate=float(learning_rate)
+        learning_rate=float(learning_rate),
+        num_layers=int(num_layers)
     )
 
     # Train model
@@ -308,6 +312,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
         'activation': activation,
         'dropout_rate': float(dropout_rate),
         'activation_output': activation_output,
+        'num_layers': int(num_layers),
         'ticker': ticker if ticker else "N/A",
         'final_metrics': final_metrics,
     })
@@ -360,6 +365,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
             'activation': activation,
             'dropout_rate': float(dropout_rate),
             'activation_output': activation_output,
+            'num_layers': int(num_layers),
             'epochs': int(epochs),
             'ticker': ticker if ticker else "N/A",
             'val_dataset_file': original_val_filedata if original_val_filedata else "N/A"
