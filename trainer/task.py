@@ -57,14 +57,14 @@ def get_bigquery_client():
             return bigquery.Client()
 
 def ensure_trains_table_exists(client: bigquery.Client):
-    dataset_ref = client.dataset("play")
+    dataset_ref = client.dataset("bolsa")
     try:
         client.get_dataset(dataset_ref)
     except NotFound:
         dataset = bigquery.Dataset(dataset_ref)
         dataset.location = "EU"
         client.create_dataset(dataset)
-        print("Created dataset play")
+        print("Created dataset bolsa")
 
     table_ref = dataset_ref.table("trains")
     try:
@@ -84,10 +84,10 @@ def ensure_trains_table_exists(client: bigquery.Client):
         ]
         table = bigquery.Table(table_ref, schema=schema)
         client.create_table(table)
-        print("Created table play.trains")
+        print("Created table bolsa.trains")
 
 def insert_train_result(client: bigquery.Client, row_data: dict):
-    table_ref = client.dataset("play").table("trains")
+    table_ref = client.dataset("bolsa").table("trains")
     errors = client.insert_rows_json(table_ref, [row_data])
     if errors:
         raise RuntimeError(f"Failed to insert row into BigQuery: {errors}")
@@ -338,10 +338,10 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
     if aip_model_dir:
         # Save directly to Vertex AI model dir
         gcs_save_path = os.path.join(aip_model_dir, "model.h5")
-        # TensorFlow can save directly to gs:// paths
-        model_rnn.save(gcs_save_path)
+        # Copy local model (with embedded metadata) directly to AIP_MODEL_DIR in GCS
+        tf.io.gfile.copy(local_model_path, gcs_save_path, overwrite=True)
         model_gcs_url = gcs_save_path
-        logging.info(f"Saved model directly to AIP_MODEL_DIR: {gcs_save_path}")
+        logging.info(f"Copied metadata-enriched model to AIP_MODEL_DIR: {gcs_save_path}")
     else:
         # Upload to custom bucket path
         trial_suffix = f"/trial_{trial_id}" if trial_id else ""
@@ -386,7 +386,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
         }
         
         insert_train_result(bq_client, row_data)
-        logging.info("Successfully wrote training results to BigQuery play.trains table!")
+        logging.info("Successfully wrote training results to BigQuery bolsa.trains table!")
     except Exception as e:
         logging.error(f"Failed to write results to BigQuery: {e}")
 

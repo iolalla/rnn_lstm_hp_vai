@@ -120,10 +120,12 @@ if resume_job_id:
     # Wait for the job to complete
     hp_job._block_until_complete()
 else:
-    # Create CustomJob
+    # Create CustomJob with explicit base_output_dir to preserve trial artifacts
+    base_output_dir = f"{STAGING_BUCKET}/hp_tuning/{JOB_NAME}"
     my_custom_job = aiplatform.CustomJob(
         display_name=f"{JOB_NAME}-custom-job",
         worker_pool_specs=worker_pool_specs,
+        base_output_dir=base_output_dir,
     )
 
     # Define parameter specs for tuning
@@ -221,7 +223,7 @@ if best_trial:
         # Fallback to default naming convention if proto structure is different
         staging_bucket_name = STAGING_BUCKET.replace("gs://", "")
         staging_bucket = storage_client.get_bucket(staging_bucket_name)
-        best_trial_model_blob_name = f"rnn_lstm_hp_vai/{JOB_NAME}/trial_{best_trial.id}/model.h5"
+        best_trial_model_blob_name = f"hp_tuning/{JOB_NAME}/{best_trial.id}/model/model.h5"
         best_blob = staging_bucket.blob(best_trial_model_blob_name)
         logging.info(f"Looking for model blob at gs://{staging_bucket_name}/{best_trial_model_blob_name}...")
     
