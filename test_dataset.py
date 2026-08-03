@@ -2,7 +2,7 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 
-filedata="data/reall-complete-IBEX-2021.csv"
+filedata="data/reall-complete-2000-2020.csv"
 print("Loading data...\n")
 data = pd.read_csv(filedata)
 # Filter for SAN.MC ticker to get a single time series

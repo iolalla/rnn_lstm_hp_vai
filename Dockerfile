@@ -1,6 +1,6 @@
 FROM gcr.io/deeplearning-platform-release/tf-cpu.2-15.py310
 WORKDIR /
-ENV GCLOUD_PROJECT=banca-march-379915
+# ENV GCLOUD_PROJECT=my-gcp-project-id
 
 # Install dependencies
 COPY requirements.txt /requirements.txt

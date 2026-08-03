@@ -21,4 +21,7 @@ model/
 .idea/
 .vscode/
 .ipynb_checkpoints/
-banca-march-key.json
+*-key.json
+*credentials*.json
+*.pem
+*.key

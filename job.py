@@ -34,17 +34,27 @@ if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ and "GOOGLE_APPLICATION_CREDEN
     del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
 
 # Constants
-PROJECT_ID = os.getenv("PROJECT_ID", "game-bolsa")
+PROJECT_ID = os.getenv("PROJECT_ID", "my-gcp-project-id")
 LOCATION = os.getenv("LOCATION", "europe-west1")
-STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://game-bolsa-models-hp")
-MODEL_BUCKET_NAME = os.getenv("MODEL_BUCKET_NAME", "game-bolsa-models")
-IMAGE_URI = os.getenv("IMAGE_URI", "gcr.io/game-bolsa/rnn_lstm_vai:hypertune")
+STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://my-staging-bucket-hp")
+MODEL_BUCKET_NAME = os.getenv("MODEL_BUCKET_NAME", "my-model-bucket").replace("gs://", "")
+IMAGE_URI = os.getenv("IMAGE_URI", "gcr.io/my-gcp-project-id/rnn_lstm_vai:hypertune")
 SERVICE_ACCOUNT = os.getenv("SERVICE_ACCOUNT")
-JOB_NAME = f"ibex-rnn-lstm-hp-{int(time.time())}"
+
+# Additional configuration for logging and models
+BIGQUERY_DATASET = os.getenv("BIGQUERY_DATASET", "ml_training")
+MODEL_NAME = os.getenv("MODEL_NAME", "rnn_lstm_hp_model")
+
+# Determine Job Name and append timestamp if not already suffixed with numbers
+_base_job_name = os.getenv("JOB_NAME", "rnn-lstm-hp-tuning")
+if not any(char.isdigit() for char in _base_job_name.split("-")[-1]):
+    JOB_NAME = f"{_base_job_name}-{int(time.time())}"
+else:
+    JOB_NAME = _base_job_name
 
 # Dataset and filtering configuration
-FILEDATA = os.getenv("FILEDATA", f"{STAGING_BUCKET}/data/reall-complete-2000-2020.csv")
-VAL_FILEDATA = os.getenv("VAL_FILEDATA", f"{STAGING_BUCKET}/data/reall-complete-IBEX-2021.csv")
+FILEDATA = os.getenv("FILEDATA", f"{STAGING_BUCKET}/data/train-dataset.csv")
+VAL_FILEDATA = os.getenv("VAL_FILEDATA", f"{STAGING_BUCKET}/data/val-dataset.csv")
 
 # Define custom credentials class to automatically refresh gcloud access token
 class GcloudCredentials(BaseCredentials):
@@ -52,30 +62,32 @@ class GcloudCredentials(BaseCredentials):
         super().__init__()
         self.token = None
         
-    def refresh(self, request):
+    def refresh(self, request=None):
         logging.info("Refreshing gcloud access token...")
         try:
             self.token = subprocess.check_output(["gcloud", "auth", "print-access-token"], stderr=subprocess.DEVNULL).decode("utf-8").strip()
+            # Set token expiry so gRPC channels know when to trigger a refresh
+            self.expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=55)
             logging.info("Successfully refreshed gcloud access token.")
         except Exception as e:
             logging.error(f"Failed to refresh gcloud token: {e}")
             raise e
 
-# Load credentials (first try standard GCP discovery, then fallback to custom gcloud class)
+# Load credentials: try active gcloud session first for local developer workstations, fallback to standard GCP auth
 creds = None
 try:
-    import google.auth
-    creds, default_project = google.auth.default()
-    logging.info(f"Successfully loaded default Google Cloud credentials (Type: {type(creds).__name__}).")
+    creds = GcloudCredentials()
+    creds.refresh()  # Test immediately to verify gcloud CLI is available and authenticated
+    logging.info("Using self-refreshing gcloud credentials from active terminal.")
 except Exception as e:
-    logging.warning(f"Failed to load default GCP credentials: {e}")
-
-if not creds:
+    logging.info(f"Could not load active gcloud session ({e}), falling back to google.auth.default()...")
     try:
-        logging.info("No standard credentials found. Using self-refreshing gcloud credentials fallback...")
-        creds = GcloudCredentials()
-    except Exception as e:
-        logging.warning(f"Failed to initialize custom gcloud credentials: {e}. Falling back to default auth.")
+        import google.auth
+        creds, default_project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        logging.info(f"Successfully loaded default Google Cloud credentials (Type: {type(creds).__name__}).")
+    except Exception as e2:
+        logging.error(f"Failed to load default GCP credentials: {e2}. Proceeding without explicit credentials.")
+        creds = None
 
 # Initialize Vertex AI SDK
 aiplatform.init(project=PROJECT_ID, location=LOCATION, staging_bucket=STAGING_BUCKET, credentials=creds)
@@ -85,7 +97,9 @@ container_args = [
     "--epochs", "20",
     "--filedata", FILEDATA,
     "--bucket_name", MODEL_BUCKET_NAME,
-    "--job_id", JOB_NAME
+    "--job_id", JOB_NAME,
+    "--bq_dataset", BIGQUERY_DATASET,
+    "--model_name", MODEL_NAME
 ]
 
 if VAL_FILEDATA:

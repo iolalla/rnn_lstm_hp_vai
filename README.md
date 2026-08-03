@@ -53,11 +53,13 @@ pip install -r requirements.txt
 ### 3. Configure Environment Variables
 Create a `.env` file in the root directory to configure your Google Cloud project and bucket names:
 ```env
-PROJECT_ID=banca-march-379915
+PROJECT_ID=my-gcp-project-id
 LOCATION=europe-west1
-STAGING_BUCKET=gs://banca-march-models
-MODEL_BUCKET_NAME=banca-march-models
-IMAGE_URI=gcr.io/banca-march-379915/rnn_lstm_vai:hypertune
+STAGING_BUCKET=gs://my-staging-bucket-hp
+MODEL_BUCKET_NAME=my-model-bucket
+IMAGE_URI=gcr.io/my-gcp-project-id/rnn_lstm_vai:hypertune
+BIGQUERY_DATASET=ml_training
+MODEL_NAME=rnn_lstm_hp_model
 ```
 
 ---
@@ -71,7 +73,7 @@ make run-local-script
 This runs the training script using `uv run python3 trainer/task.py` with:
 - 2 epochs
 - Hyperparameters: 32 units, relu activation, 0.1 dropout, linear output, 0.001 learning rate
-- Dataset: `data/reall-complete-IBEX-2021.csv`
+- Dataset: `data/val-dataset-2021.csv`
 - Ticker: `SAN.MC` (Banco Santander)
 
 To run with custom parameters:
@@ -82,7 +84,7 @@ uv run python3 trainer/task.py \
   --units=64 \
   --activation=tanh \
   --dropout_rate=0.2 \
-  --filedata=data/reall-complete-IBEX-2021.csv \
+  --filedata=data/val-dataset-2021.csv \
   --ticker=SAN.MC
 ```
 
@@ -137,7 +139,7 @@ When a model finishes training, `model_metadata.py` embeds crucial metadata dire
 - **Evaluation Summary**: Final loss, MSE, MAE, RMSE, and Directional Accuracy.
 
 ### BigQuery Integration
-Training results are automatically logged to the `play.trains` table in BigQuery. This allows you to write SQL queries to compare different training runs and trials over time:
+Training results are automatically logged to the `trains` table inside your configured BigQuery dataset. This allows you to write SQL queries to compare different training runs and trials over time:
 ```sql
 SELECT 
   job_id, 
@@ -147,6 +149,6 @@ SELECT
   JSON_VALUE(metrics, '$.mse') as val_mse,
   JSON_VALUE(metrics, '$.directional_accuracy') as dir_accuracy,
   model_path 
-FROM `banca-march-379915.play.trains` 
+FROM `my-gcp-project-id.ml_training.trains` 
 ORDER BY training_date DESC;
 ```

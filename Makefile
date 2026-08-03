@@ -4,7 +4,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-IMAGE_URI ?= gcr.io/banca-march/rnn_lstm_vai:hypertune
+IMAGE_URI ?= gcr.io/my-gcp-project-id/rnn_lstm_vai:hypertune
 
 help: ## show help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[$$()% a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -30,7 +30,7 @@ run-local: ## Run the container locally using host network to connect to BigQuer
 		--dropout_rate=0.1 \
 		--activation_output=linear \
 		--filedata=data/reall-complete-2000-2020.csv \
-		--val_filedata=data/reall-complete-IBEX-2021.csv \
+		--val_filedata=data/val-dataset-2021.csv \
 		--ticker=SAN.MC
 
 all: cloud-build push ## Build and push the image

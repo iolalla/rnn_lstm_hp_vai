@@ -45,7 +45,7 @@ def get_bigquery_client():
         client_options = ClientOptions(api_endpoint=endpoint)
         from google.auth.credentials import AnonymousCredentials
         return bigquery.Client(
-            project="banca-march-379915",
+            project=os.getenv("PROJECT_ID", os.getenv("GCLOUD_PROJECT", "test-project")),
             client_options=client_options,
             credentials=AnonymousCredentials()
         )
@@ -56,15 +56,15 @@ def get_bigquery_client():
         else:
             return bigquery.Client()
 
-def ensure_trains_table_exists(client: bigquery.Client):
-    dataset_ref = client.dataset("bolsa")
+def ensure_trains_table_exists(client: bigquery.Client, dataset_id: str = "ml_training"):
+    dataset_ref = client.dataset(dataset_id)
     try:
         client.get_dataset(dataset_ref)
     except NotFound:
         dataset = bigquery.Dataset(dataset_ref)
         dataset.location = "EU"
         client.create_dataset(dataset)
-        print("Created dataset bolsa")
+        print(f"Created dataset {dataset_id}")
 
     table_ref = dataset_ref.table("trains")
     try:
@@ -84,10 +84,10 @@ def ensure_trains_table_exists(client: bigquery.Client):
         ]
         table = bigquery.Table(table_ref, schema=schema)
         client.create_table(table)
-        print("Created table bolsa.trains")
+        print(f"Created table {dataset_id}.trains")
 
-def insert_train_result(client: bigquery.Client, row_data: dict):
-    table_ref = client.dataset("bolsa").table("trains")
+def insert_train_result(client: bigquery.Client, row_data: dict, dataset_id: str = "ml_training"):
+    table_ref = client.dataset(dataset_id).table("trains")
     errors = client.insert_rows_json(table_ref, [row_data])
     if errors:
         raise RuntimeError(f"Failed to insert row into BigQuery: {errors}")
@@ -133,8 +133,8 @@ def create_sequences(data: pd.DataFrame, seq_length: int) -> tuple:
         ys.append(y.values.flatten())  # Aplana para forma (10,)
     return np.array(xs), np.array(ys)
 
-def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-hp/data/reall-complete-2000-2020.csv",
-                   modelpath="model/ibex_rnn_lstm_hp_model.h5",
+def train_evaluate(filedata=None,
+                   modelpath=None,
                    epochs=10,
                    learning_rate=0.001,
                    units=50,
@@ -144,10 +144,26 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
                    num_layers=1,
                    job_id=None,
                    trial_id=None,
-                   bucket_name="banca-march-models",
+                   bucket_name=None,
                    ticker=None,
-                   val_filedata=None
+                   val_filedata=None,
+                   bq_dataset=None,
+                   model_name=None
                    ):
+    # Resolve configuration from environment if not explicitly passed as arguments
+    if not filedata:
+        filedata = os.getenv("FILEDATA", "data/reall-complete-2000-2020.csv")
+    if not val_filedata:
+        val_filedata = os.getenv("VAL_FILEDATA")
+    if not modelpath:
+        modelpath = os.getenv("MODEL_PATH", "model/rnn_lstm_hp_model.h5")
+    if not bucket_name:
+        bucket_name = os.getenv("MODEL_BUCKET_NAME", "my-model-bucket")
+    if not bq_dataset:
+        bq_dataset = os.getenv("BIGQUERY_DATASET", "ml_training")
+    if not model_name:
+        model_name = os.getenv("MODEL_NAME", "rnn_lstm_hp_model")
+
     # Set job_id and trial_id from env if not passed
     if not job_id:
         job_id = os.getenv("AIP_JOB_ID", "local_job_" + str(round(time.time())))
@@ -356,7 +372,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
     # Write results to BigQuery
     try:
         bq_client = get_bigquery_client()
-        ensure_trains_table_exists(bq_client)
+        ensure_trains_table_exists(bq_client, dataset_id=bq_dataset)
         
         # Prepare row data
         parameters_json = json.dumps({
@@ -375,7 +391,7 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
         row_data = {
             "job_id": str(job_id),
             "trial_id": str(trial_id) if trial_id else None,
-            "model_name": "ibex_rnn_lstm_hp_model",
+            "model_name": str(model_name),
             "training_date": datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
             "parameters": parameters_json,
             "metrics": metrics_json,
@@ -385,8 +401,8 @@ def train_evaluate(filedata="https://storage.googleapis.com/banca-march-models-h
             "dataset_file": original_filedata
         }
         
-        insert_train_result(bq_client, row_data)
-        logging.info("Successfully wrote training results to BigQuery bolsa.trains table!")
+        insert_train_result(bq_client, row_data, dataset_id=bq_dataset)
+        logging.info(f"Successfully wrote training results to BigQuery {bq_dataset}.trains table!")
     except Exception as e:
         logging.error(f"Failed to write results to BigQuery: {e}")
 
