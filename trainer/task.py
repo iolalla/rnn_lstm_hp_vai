@@ -36,7 +36,9 @@ import hypertune
 
 warnings.filterwarnings('ignore')
 
-def get_bigquery_client():
+def get_bigquery_client(project: str = None):
+    if not project:
+        project = os.getenv("PROJECT_ID", os.getenv("GCLOUD_PROJECT", os.getenv("GCP_PROJECT")))
     is_local = os.getenv("ISLOCAL", "false").lower() == "true"
     if is_local:
         endpoint = os.getenv("BIGQUERY_EMULATOR_HOST", "http://localhost:9050")
@@ -45,16 +47,16 @@ def get_bigquery_client():
         client_options = ClientOptions(api_endpoint=endpoint)
         from google.auth.credentials import AnonymousCredentials
         return bigquery.Client(
-            project=os.getenv("PROJECT_ID", os.getenv("GCLOUD_PROJECT", "test-project")),
+            project=project or "test-project",
             client_options=client_options,
             credentials=AnonymousCredentials()
         )
     else:
         creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if creds_path and os.path.exists(creds_path):
-            return bigquery.Client.from_service_account_json(creds_path)
+            return bigquery.Client.from_service_account_json(creds_path, project=project)
         else:
-            return bigquery.Client()
+            return bigquery.Client(project=project)
 
 def ensure_trains_table_exists(client: bigquery.Client, dataset_id: str = "ml_training"):
     dataset_ref = client.dataset(dataset_id)
@@ -148,9 +150,12 @@ def train_evaluate(filedata=None,
                    ticker=None,
                    val_filedata=None,
                    bq_dataset=None,
-                   model_name=None
+                   model_name=None,
+                   project_id=None
                    ):
     # Resolve configuration from environment if not explicitly passed as arguments
+    if not project_id:
+        project_id = os.getenv("PROJECT_ID", os.getenv("GCLOUD_PROJECT"))
     if not filedata:
         filedata = os.getenv("FILEDATA", "data/reall-complete-2000-2020.csv")
     if not val_filedata:
@@ -371,7 +376,7 @@ def train_evaluate(filedata=None,
 
     # Write results to BigQuery
     try:
-        bq_client = get_bigquery_client()
+        bq_client = get_bigquery_client(project=project_id)
         ensure_trains_table_exists(bq_client, dataset_id=bq_dataset)
         
         # Prepare row data

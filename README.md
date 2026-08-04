@@ -125,7 +125,7 @@ This script will:
 4. Submit a `HyperparameterTuningJob` (runs up to 15 trials, 3 in parallel).
 5. Poll the job until completion.
 6. Identify the best trial based on the minimum Validation Mean Squared Error (MSE).
-7. Copy the best trial's model file (`model.h5`) to the root of your model bucket as `rnn_lstm_hp_vai/best_model.h5`.
+7. Copy the best trial's model file (`model.h5`) to a date-versioned GCS folder as `rnn_lstm_hp_vai/YYYY-MM-DD_HHMMSS/best_model.h5` and update the top-level pointer at `rnn_lstm_hp_vai/best_model.h5`.
 
 ---
 

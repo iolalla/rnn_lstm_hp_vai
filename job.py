@@ -66,8 +66,8 @@ class GcloudCredentials(BaseCredentials):
         logging.info("Refreshing gcloud access token...")
         try:
             self.token = subprocess.check_output(["gcloud", "auth", "print-access-token"], stderr=subprocess.DEVNULL).decode("utf-8").strip()
-            # Set token expiry so gRPC channels know when to trigger a refresh
-            self.expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=55)
+            # Set token expiry using offset-naive UTC datetime to align with google-auth internals
+            self.expiry = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(minutes=55)
             logging.info("Successfully refreshed gcloud access token.")
         except Exception as e:
             logging.error(f"Failed to refresh gcloud token: {e}")
@@ -99,7 +99,8 @@ container_args = [
     "--bucket_name", MODEL_BUCKET_NAME,
     "--job_id", JOB_NAME,
     "--bq_dataset", BIGQUERY_DATASET,
-    "--model_name", MODEL_NAME
+    "--model_name", MODEL_NAME,
+    "--project_id", PROJECT_ID
 ]
 
 if VAL_FILEDATA:
@@ -214,7 +215,9 @@ if best_trial:
     # Copy the best trial's model to the final GCS path
     storage_client = storage.Client(project=PROJECT_ID, credentials=creds)
     dest_bucket = storage_client.get_bucket(MODEL_BUCKET_NAME)
-    final_model_blob_name = "rnn_lstm_hp_vai/best_model.h5"
+    date_str = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    versioned_blob_name = f"rnn_lstm_hp_vai/{date_str}/best_model.h5"
+    latest_blob_name = "rnn_lstm_hp_vai/best_model.h5"
     
     # Try to get the base output directory from the job object
     try:
@@ -270,11 +273,15 @@ if best_trial:
             # Embed updated metadata back into the file
             embed_metadata_h5(local_temp_model, meta)
             
-            # Upload the modified file back to GCS
-            logging.info(f"Uploading updated best model to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}...")
-            dest_blob = dest_bucket.blob(final_model_blob_name)
-            dest_blob.upload_from_filename(local_temp_model)
-            logging.info(f"Successfully saved updated best model to gs://{MODEL_BUCKET_NAME}/{final_model_blob_name}!")
+            # Upload the modified file back to GCS (versioned folder + latest alias)
+            logging.info(f"Uploading versioned best model to gs://{MODEL_BUCKET_NAME}/{versioned_blob_name}...")
+            versioned_blob = dest_bucket.blob(versioned_blob_name)
+            versioned_blob.upload_from_filename(local_temp_model)
+            logging.info(f"Successfully saved versioned best model to gs://{MODEL_BUCKET_NAME}/{versioned_blob_name}!")
+            
+            # Update latest pointer via server-side GCS copy
+            dest_bucket.copy_blob(versioned_blob, dest_bucket, latest_blob_name)
+            logging.info(f"Updated latest model pointer at gs://{MODEL_BUCKET_NAME}/{latest_blob_name}!")
         finally:
             # Clean up local temp file
             if os.path.exists(local_temp_model):
