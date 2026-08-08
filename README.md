@@ -53,11 +53,11 @@ pip install -r requirements.txt
 ### 3. Configure Environment Variables
 Create or verify `.env` in the root directory:
 ```env
-PROJECT_ID=banca-march-379915
+PROJECT_ID=YOURPROJECT
 LOCATION=europe-west1
-STAGING_BUCKET=gs://banca-march-models-hp
-MODEL_BUCKET_NAME=banca-march-models
-IMAGE_URI=europe-docker.pkg.dev/banca-march-379915/vertexai/rnn_lstm_vai:hypertune
+STAGING_BUCKET=gs://YOURBUCKET
+MODEL_BUCKET_NAME=ANOTHERBUCKET
+IMAGE_URI=europe-docker.pkg.dev/YOURPROJECT/vertexai/rnn_lstm_vai:hypertune
 BIGQUERY_DATASET=bolsa
 MODEL_NAME=ibex_rnn_lstm_hp_model
 ```
