@@ -18,10 +18,10 @@ push: ## Push the Docker image to GCR
 cloud-build: ## Build the Docker image using Google Cloud Build (no local Docker required)
 	gcloud builds submit --tag $(IMAGE_URI) .
 
-job: ## Run the orchestrator job script locally to submit to Vertex AI
+job: ## Run the orchestrator hyperparameter tuning job script locally to submit to Vertex AI
 	uv run python3 job.py
 
-run-local: ## Run the container locally using host network to connect to BigQuery emulator
+run-local: ## Run the local training script
 	uv run python3 trainer/task.py \
 		--epochs=2 \
 		--learning_rate=0.001 \

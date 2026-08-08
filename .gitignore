@@ -16,6 +16,8 @@ data/
 model.h5
 *.h5
 model/
+*experiments-2026*
+experiment_*/
 
 # IDEs
 .idea/

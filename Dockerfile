@@ -1,16 +1,16 @@
 FROM gcr.io/deeplearning-platform-release/tf-cpu.2-15.py310
-WORKDIR /
-# ENV GCLOUD_PROJECT=my-gcp-project-id
+WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt /requirements.txt
-RUN pip install --no-cache-dir -r /requirements.txt
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy shared utilities
-COPY model_metadata.py /model_metadata.py
+COPY model_metadata.py /app/model_metadata.py
 
-# Copy trainer code
-COPY trainer /trainer
+# Copy trainer package
+COPY trainer /app/trainer
 
-# Set up the entry point to invoke the trainer.
+# Default entry point
 ENTRYPOINT ["python", "-m", "trainer.task"]
+
