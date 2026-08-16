@@ -53,14 +53,34 @@ pip install -r requirements.txt
 ### 3. Configure Environment Variables
 Create or verify `.env` in the root directory:
 ```env
-PROJECT_ID=YOURPROJECT
+PROJECT_ID=my-gcp-project
 LOCATION=europe-west1
-STAGING_BUCKET=gs://YOURBUCKET
-MODEL_BUCKET_NAME=ANOTHERBUCKET
-IMAGE_URI=europe-docker.pkg.dev/YOURPROJECT/vertexai/rnn_lstm_vai:hypertune
-BIGQUERY_DATASET=bolsa
-MODEL_NAME=ibex_rnn_lstm_hp_model
+STAGING_BUCKET=gs://my-staging-bucket/vertex-ai
+MODEL_BUCKET_NAME=my-model-bucket
+IMAGE_URI=gcr.io/my-gcp-project/vertexai/rnn_lstm_vai:hypertune
+SERVICE_ACCOUNT=vertex-ai-training@my-gcp-project.iam.gserviceaccount.com
+BIGQUERY_DATASET=ml_training
+MODEL_NAME=rnn_lstm_hp_model
+
+# Optional
+JOB_NAME=rnn-lstm-hp-tuning
+FILEDATA=gs://my-staging-bucket/vertex-ai/data/train-dataset.csv
+VAL_FILEDATA=gs://my-staging-bucket/vertex-ai/data/val-dataset.csv
+RESUME_JOB_ID=
 ```
+
+- `PROJECT_ID`: Google Cloud project ID.
+- `LOCATION`: Vertex AI region.
+- `STAGING_BUCKET`: GCS path for staging artifacts and trial outputs.
+- `MODEL_BUCKET_NAME`: Destination GCS bucket for the best trained model.
+- `IMAGE_URI`: Container image used for training trials.
+- `SERVICE_ACCOUNT`: Email of the service account that runs the training job.
+- `BIGQUERY_DATASET`: BigQuery dataset where training results are logged.
+- `MODEL_NAME`: Name used for the model and BigQuery records.
+- `JOB_NAME`: Optional display name for the tuning job (defaults to `rnn-lstm-hp-tuning`).
+- `FILEDATA`: Optional path to the training CSV (defaults to `<STAGING_BUCKET>/data/train-dataset.csv`).
+- `VAL_FILEDATA`: Optional path to the validation CSV (defaults to `<STAGING_BUCKET>/data/val-dataset.csv`).
+- `RESUME_JOB_ID`: Optional existing Vertex AI hyperparameter tuning job ID to resume polling.
 
 ---
 
@@ -92,3 +112,14 @@ This script initializes Vertex AI, submits a `HyperparameterTuningJob`, retrieve
 
 - **Vertex AI Console**: Track and compare tuning trial progress, metric charts, and parameters in real time.
 - **BigQuery Logging**: Results are automatically appended to `bolsa.trains` in BigQuery for SQL auditing.
+
+
+---
+
+## 📝 Notes
+
+If you want to see the model with best results you can use : 
+```bash
+RESUME_JOB_ID=4687416015661826048 uv run python3 job.py
+```
+

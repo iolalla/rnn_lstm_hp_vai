@@ -37,7 +37,10 @@ if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ and "GOOGLE_APPLICATION_CREDEN
 PROJECT_ID = os.getenv("PROJECT_ID", "my-gcp-project-id")
 LOCATION = os.getenv("LOCATION", "europe-west1")
 STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://my-staging-bucket-hp")
-MODEL_BUCKET_NAME = os.getenv("MODEL_BUCKET_NAME", "my-model-bucket").replace("gs://", "")
+_model_bucket_raw = os.getenv("MODEL_BUCKET_NAME", "my-model-bucket").replace("gs://", "").strip("/")
+_model_bucket_parts = _model_bucket_raw.split("/", 1)
+MODEL_BUCKET_NAME = _model_bucket_parts[0]
+MODEL_BUCKET_PREFIX = _model_bucket_parts[1] if len(_model_bucket_parts) > 1 else ""
 IMAGE_URI = os.getenv("IMAGE_URI", "gcr.io/my-gcp-project-id/rnn_lstm_vai:hypertune")
 SERVICE_ACCOUNT = os.getenv("SERVICE_ACCOUNT")
 
@@ -216,8 +219,9 @@ if best_trial:
     storage_client = storage.Client(project=PROJECT_ID, credentials=creds)
     dest_bucket = storage_client.get_bucket(MODEL_BUCKET_NAME)
     date_str = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    versioned_blob_name = f"rnn_lstm_hp_vai/{date_str}/best_model.h5"
-    latest_blob_name = "rnn_lstm_hp_vai/best_model.h5"
+    _model_prefix = f"{MODEL_BUCKET_PREFIX}/" if MODEL_BUCKET_PREFIX else ""
+    versioned_blob_name = f"{_model_prefix}{date_str}/best_model_rnn_lstm_hp_vai.h5"
+    latest_blob_name = f"{_model_prefix}best_model_rnn_lstm_hp_vai.h5"
     
     # Try to get the base output directory from the job object
     try:

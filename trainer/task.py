@@ -101,7 +101,13 @@ def upload_to_bucket(blob_name, path_to_file, bucket_name):
         storage_client = storage.Client.from_service_account_json(creds_path)
     else:
         storage_client = storage.Client()
-    bucket = storage_client.get_bucket(bucket_name)
+    # bucket_name may include a path prefix (e.g. "my-bucket/some/prefix");
+    # GCS bucket names cannot contain slashes, so split it out here.
+    bucket_name = bucket_name.replace("gs://", "").strip("/")
+    bare_bucket_name, _, prefix = bucket_name.partition("/")
+    if prefix:
+        blob_name = f"{prefix}/{blob_name}"
+    bucket = storage_client.get_bucket(bare_bucket_name)
     blob = bucket.blob(blob_name)
     blob.upload_from_filename(path_to_file)
     return blob.public_url
