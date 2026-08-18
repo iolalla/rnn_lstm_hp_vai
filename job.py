@@ -143,7 +143,7 @@ else:
     my_custom_job = aiplatform.CustomJob(
         display_name=f"{JOB_NAME}-custom-job",
         worker_pool_specs=worker_pool_specs,
-        base_output_dir=base_output_dir,
+        base_output_dir=base_output_dir
     )
 
     # Define parameter specs for tuning
@@ -170,7 +170,9 @@ else:
         parallel_trial_count=3,
     )
 
-    hp_job.run(service_account=SERVICE_ACCOUNT)
+    hp_job.run(service_account=SERVICE_ACCOUNT, 
+               scheduling_strategy=aiplatform.compat.types.custom_job.Scheduling.Strategy.SPOT
+    )
 
 logging.info("Hyperparameter Tuning Job completed successfully!")
 
